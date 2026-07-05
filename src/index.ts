@@ -4,6 +4,7 @@ import { config } from "./config.js";
 import { createSession, getSession, closeSession, listSessions, startCleanup } from "./session/manager.js";
 import { executeAction } from "./agent/executor.js";
 import { agentLoop } from "./agent/loop.js";
+import { closeAll } from "./browser/pool.js";
 
 const app = Fastify({ logger: false });
 
@@ -97,6 +98,14 @@ app.post<{ Params: { id: string }; Body: { prompt: string } }>(
     });
   },
 );
+
+async function shutdown() {
+  await closeAll();
+  process.exit(0);
+}
+
+process.on("SIGINT", shutdown);
+process.on("SIGTERM", shutdown);
 
 app.listen({ port: config.port, host: "0.0.0.0" }).then(() => {
   console.log(`BrowseAgent API running on http://localhost:${config.port}`);

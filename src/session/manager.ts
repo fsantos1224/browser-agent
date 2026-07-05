@@ -1,11 +1,11 @@
-import { chromium } from "playwright";
 import { config } from "../config.js";
+import { acquireBrowser, releaseBrowser } from "../browser/pool.js";
 import type { Session, SessionSummary } from "./types.js";
 
 const sessions = new Map<string, Session>();
 
 export async function createSession(): Promise<Session> {
-  const browser = await chromium.launch({ headless: true });
+  const browser = await acquireBrowser();
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("about:blank");
@@ -39,7 +39,7 @@ export async function closeSession(id: string): Promise<boolean> {
   s.status = "closed";
   await s.page.close().catch(() => {});
   await s.context.close().catch(() => {});
-  await s.browser.close().catch(() => {});
+  await releaseBrowser(s.browser);
   sessions.delete(id);
   return true;
 }
