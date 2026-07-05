@@ -13,7 +13,7 @@ async function main() {
   const count = await rows.count();
   console.log(`Found ${count} rows in table`);
 
-  const data: Record<string, string>[] = [];
+  const data: Record<string, string | null>[] = [];
   for (let i = 0; i < count; i++) {
     const cells = rows.nth(i).locator("td");
     const row = {
