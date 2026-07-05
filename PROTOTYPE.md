@@ -10,8 +10,8 @@
 
 | Phase | What | Status |
 |---|---|---|
-| 1 | Playwright fundamentals (scripts de aprendizado) | ⬜ |
-| 2 | Terminal prototype (agente CLI sem AI) | ⬜ |
-| 3 | API HTTP + session management | ⬜ |
-| 4 | AI agent loop (OpenAI GPT-4o) | ⬜ |
-| 5 | Reliability & polish | ⬜ |
+| 1 | Playwright fundamentals (scripts de aprendizado) | ✅ |
+| 2 | Terminal prototype (agente CLI sem AI) | ✅ |
+| 3 | API HTTP + session management | ✅ |
+| 4 | AI agent loop (OpenAI GPT-4o) | ✅ |
+| 5 | Reliability & polish | ✅ |
