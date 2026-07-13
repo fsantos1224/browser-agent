@@ -64,13 +64,25 @@ const EXTRACT = {
   type: "function" as const,
   function: {
     name: "extract",
-    description: "Extract visible text from an element",
+    description: "Extract visible text from a specific element by CSS selector",
     parameters: {
       type: "object",
       properties: {
         selector: { type: "string", description: "CSS selector of the element" },
       },
       required: ["selector"],
+    },
+  },
+};
+
+const GET_CONTENT = {
+  type: "function" as const,
+  function: {
+    name: "getContent",
+    description: "Get all visible text on the current page (no selector needed). Use this to read page content and find links, buttons, or text.",
+    parameters: {
+      type: "object",
+      properties: {},
     },
   },
 };
@@ -110,6 +122,7 @@ export const toolDefinitions = [
   TYPE,
   SCROLL,
   EXTRACT,
+  GET_CONTENT,
   SCREENSHOT,
   DONE,
 ];

@@ -1,4 +1,5 @@
 import type { Browser, BrowserContext, Page } from "playwright";
+import type OpenAI from "openai";
 
 export interface Session {
   id: string;
@@ -9,6 +10,7 @@ export interface Session {
   lastActiveAt: number;
   status: "active" | "closed";
   actionCount: number;
+  history: OpenAI.Chat.ChatCompletionMessageParam[];
 }
 
 export interface SessionSummary {
@@ -19,4 +21,5 @@ export interface SessionSummary {
   actionCount: number;
   url: string;
   title: string;
+  messageCount: number;
 }

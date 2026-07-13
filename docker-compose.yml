@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  browse-agent:
+    build: 
+      context: .
+    container_name: browse-agent
+    ports:
+      - "3456:3456"
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+    restart: always
+    # Prevent Docker from killing the process during heavy browser usage
+    shm_size: '2gb'

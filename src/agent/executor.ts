@@ -15,15 +15,11 @@ export async function executeAction(page: Page, action: Action) {
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
       if (attempt > 0) {
-        await page.waitForTimeout(1000 * Math.pow(2, attempt - 1));
+        await page.waitForTimeout(100);
       }
       return await handler(page, action.args);
     } catch (err: any) {
       lastError = err.message?.split("\n")[0] || String(err);
-      if (attempt < MAX_RETRIES) {
-        // Wait before retrying
-        await page.waitForTimeout(1000);
-      }
     }
   }
 

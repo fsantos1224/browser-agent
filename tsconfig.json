@@ -10,5 +10,6 @@
     "skipLibCheck": true,
     "resolveJsonModule": true
   },
-  "include": ["src/**/*", "scripts/**/*", "cli.ts"]
+  "include": ["src/**/*", "scripts/**/*", "cli.ts"],
+  "exclude": ["scripts/_router_runner.ts"]
 }

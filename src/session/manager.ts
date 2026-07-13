@@ -1,7 +1,9 @@
 import { config } from "../config.js";
 import { acquireBrowser, releaseBrowser } from "../browser/pool.js";
+import { child } from "../logger.js";
 import type { Session, SessionSummary } from "./types.js";
 
+const log = child("session");
 const sessions = new Map<string, Session>();
 
 export async function createSession(): Promise<Session> {
@@ -20,6 +22,7 @@ export async function createSession(): Promise<Session> {
     lastActiveAt: Date.now(),
     status: "active",
     actionCount: 0,
+    history: [],
   };
   sessions.set(id, session);
   return session;
@@ -44,33 +47,44 @@ export async function closeSession(id: string): Promise<boolean> {
   return true;
 }
 
-export function listSessions(): SessionSummary[] {
-  return Array.from(sessions.values()).map(toSummary);
+export async function listSessions(): Promise<SessionSummary[]> {
+  return Promise.all(Array.from(sessions.values()).map(async (s) => {
+    return {
+      id: s.id,
+      status: s.status,
+      createdAt: s.createdAt,
+      lastActiveAt: s.lastActiveAt,
+      actionCount: s.actionCount,
+      url: s.page.url(),
+      title: await s.page.title().catch(() => ""),
+      messageCount: s.history.length,
+    };
+  }));
 }
 
-function toSummary(s: Session): SessionSummary {
-  return {
-    id: s.id,
-    status: s.status,
-    createdAt: s.createdAt,
-    lastActiveAt: s.lastActiveAt,
-    actionCount: s.actionCount,
-    url: s.page.url(),
-    title: "",
-  };
-}
+// Remove the toSummary function as it's now integrated into listSessions
 
 export function startCleanup() {
-  setInterval(() => {
+  const timer = setInterval(() => {
     const now = Date.now();
+    let cleaned = 0;
     for (const [id, s] of sessions) {
       if (s.status === "closed") {
         sessions.delete(id);
+        cleaned++;
         continue;
       }
       if (now - s.lastActiveAt > config.sessionTTL) {
-        closeSession(id);
+        closeSession(id).then(() => log.info({ sessionId: id }, "session expired"));
       }
     }
+    if (cleaned > 0) log.info({ cleaned }, "cleanup sweep");
   }, config.cleanupInterval);
+  timer.unref();
+  return timer;
+}
+
+export async function closeAllSessions(): Promise<void> {
+  const ids = Array.from(sessions.keys());
+  await Promise.allSettled(ids.map((id) => closeSession(id)));
 }

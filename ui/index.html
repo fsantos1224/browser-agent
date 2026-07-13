@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>BrowseAgent</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = {
+  darkMode: "class",
+  theme: {
+    extend: {
+      fontFamily: {
+        sans: ['"Fira Sans"', "system-ui", "sans-serif"],
+        mono: ['"Fira Code"', "monospace"],
+      },
+      colors: {
+        surface: { DEFAULT: "#0F172A", light: "#1E293B", border: "#334155" },
+        accent: { DEFAULT: "#22C55E", hover: "#16A34A", muted: "#166534" },
+      },
+    },
+  },
+};
+</script>
+<link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600;700&family=Fira+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+* { scrollbar-width: thin; scrollbar-color: #334155 transparent; }
+html { background: #0F172A; }
+body { background: #0F172A; }
+
+.tab-btn.active {
+  background: #22C55E;
+  color: #052E16;
+}
+.tab-btn:not(.active) {
+  background: transparent;
+  color: #94A3B8;
+}
+.tab-btn:not(.active):hover {
+  background: #1E293B;
+  color: #F8FAFC;
+}
+
+.session-item.active {
+  background: #1E293B;
+  border-color: #22C55E;
+}
+.session-item:not(.active) {
+  background: transparent;
+  border-color: transparent;
+}
+.session-item:not(.active):hover {
+  background: #1E293B;
+}
+
+.msg-step {
+  border-left: 2px solid #334155;
+}
+.msg-step:last-child {
+  border-left-color: #22C55E;
+}
+
+.skel { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+@keyframes pulse { 50% { opacity: 0.4; } }
+
+@keyframes spin { to { transform: rotate(360deg); } }
+.spinner { animation: spin 0.7s linear infinite; }
+
+@media (prefers-reduced-motion: reduce) {
+  .skel, .spinner { animation: none; }
+  * { transition-duration: 0ms !important; }
+}
+</style>
+</head>
+<body class="text-[#F8FAFC] font-sans antialiased h-screen overflow-hidden flex flex-col">
+
+<header class="flex items-center justify-between px-5 py-3 border-b border-[#334155] shrink-0 bg-[#0F172A]/95 backdrop-blur">
+  <div class="flex items-center gap-3">
+    <svg class="w-6 h-6 text-accent" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+    <h1 class="text-lg font-semibold tracking-tight font-mono">BrowseAgent</h1>
+    <span id="badgeApi" class="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-[#1E293B] text-[#94A3B8] border border-[#334155]">API</span>
+  </div>
+  <button onclick="createSession()" class="flex items-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg bg-accent text-[#052E16] hover:bg-accent-hover transition-colors duration-200 cursor-pointer">
+    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+    New Session
+  </button>
+</header>
+
+<div class="flex flex-1 overflow-hidden">
+  <aside class="w-64 shrink-0 border-r border-[#334155] flex flex-col bg-[#0F172A]">
+    <div class="px-4 py-3 border-b border-[#334155]">
+      <h2 class="text-xs font-semibold text-[#64748B] uppercase tracking-wider">Sessions</h2>
+    </div>
+    <div id="sessionList" class="flex-1 overflow-y-auto p-2 space-y-1">
+      <div class="text-center text-sm text-[#64748B] py-8">No sessions yet.<br/>Click "New Session" above.</div>
+    </div>
+  </aside>
+
+  <main class="flex-1 flex flex-col overflow-hidden bg-[#0F172A]">
+    <div id="noSession" class="flex-1 flex items-center justify-center">
+      <div class="text-center">
+        <svg class="w-16 h-16 mx-auto text-[#334155] mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9"/></svg>
+        <p class="text-[#64748B]">Create a session to start browsing</p>
+      </div>
+    </div>
+
+    <div id="sessionView" class="hidden flex-1 flex flex-col overflow-hidden">
+      <div id="screenshotPanel" class="relative flex-1 min-h-0 bg-[#0F172A] border-b border-[#334155] flex items-center justify-center overflow-hidden">
+        <div id="screenshotEmpty" class="text-center text-[#64748B]">
+          <svg class="w-10 h-10 mx-auto mb-2 opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>
+          <p class="text-sm">Page screenshot appears here</p>
+        </div>
+        <img id="screenshotImg" class="hidden max-w-full max-h-full object-contain" alt="Page screenshot" />
+        <div id="screenshotOverlay" class="hidden absolute inset-0 bg-[#0F172A]/80 flex items-center justify-center z-10">
+          <svg class="w-8 h-8 spinner text-accent" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+        </div>
+      </div>
+
+      <div class="shrink-0 border-b border-[#334155] flex bg-[#0F172A]">
+        <button class="tab-btn active px-4 py-2 text-sm font-medium transition-colors duration-200 cursor-pointer" data-tab="agent" onclick="switchTab('agent')">Agent</button>
+        <button class="tab-btn px-4 py-2 text-sm font-medium transition-colors duration-200 cursor-pointer" data-tab="manual" onclick="switchTab('manual')">Manual</button>
+        <button class="tab-btn px-4 py-2 text-sm font-medium transition-colors duration-200 cursor-pointer" data-tab="info" onclick="switchTab('info')">Info</button>
+        <div class="flex-1"></div>
+        <div class="flex items-center gap-3 px-4 text-xs text-[#64748B] font-mono">
+          <span id="stateUrl" class="truncate max-w-[200px]">about:blank</span>
+          <span class="w-px h-3 bg-[#334155]"></span>
+          <span id="stateSteps">0 steps</span>
+        </div>
+      </div>
+
+      <div id="tabAgent" class="flex-1 flex flex-col overflow-hidden">
+        <div id="chatLog" class="flex-1 overflow-y-auto p-3 space-y-2 text-sm">
+          <div class="text-[#64748B] text-center py-8">Send a prompt to the agent,<br/>or use the Manual tab for direct control.</div>
+        </div>
+        <div class="shrink-0 p-3 border-t border-[#334155] bg-[#0F172A]">
+          <div class="flex gap-2">
+            <input id="agentPrompt" type="text" placeholder="e.g. Go to google.com and search for Playwright" class="flex-1 bg-[#1E293B] border border-[#334155] rounded-lg px-3 py-2 text-sm text-[#F8FAFC] placeholder-[#64748B] outline-none focus:border-accent focus:ring-1 focus:ring-accent/30 transition-colors" onkeydown="if(event.key==='Enter') runAgent()" />
+            <button onclick="runAgent()" id="agentBtn" class="px-4 py-2 text-sm font-medium rounded-lg bg-accent text-[#052E16] hover:bg-accent-hover transition-colors duration-200 flex items-center gap-1.5 cursor-pointer shrink-0">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg>
+              Send
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="tabManual" class="hidden flex-1 overflow-y-auto p-4 space-y-4">
+        <div class="grid grid-cols-2 gap-4">
+          <div class="bg-[#1E293B] rounded-lg p-3 border border-[#334155]">
+            <label class="text-xs font-medium text-[#94A3B8] block mb-1.5">Navigate</label>
+            <div class="flex gap-2">
+              <input id="mUrl" type="text" placeholder="URL" class="flex-1 bg-[#0F172A] border border-[#334155] rounded px-2 py-1.5 text-sm text-[#F8FAFC] placeholder-[#64748B] outline-none focus:border-accent/50" onkeydown="if(event.key==='Enter') mNavigate()" />
+              <button onclick="mNavigate()" class="px-3 py-1.5 text-xs font-medium rounded bg-accent text-[#052E16] hover:bg-accent-hover transition-colors cursor-pointer shrink-0">Go</button>
+            </div>
+          </div>
+          <div class="bg-[#1E293B] rounded-lg p-3 border border-[#334155]">
+            <label class="text-xs font-medium text-[#94A3B8] block mb-1.5">Click</label>
+            <div class="flex gap-2">
+              <input id="mClick" type="text" placeholder="CSS selector" class="flex-1 bg-[#0F172A] border border-[#334155] rounded px-2 py-1.5 text-sm text-[#F8FAFC] placeholder-[#64748B] outline-none focus:border-accent/50" onkeydown="if(event.key==='Enter') mClick()" />
+              <button onclick="mClick()" class="px-3 py-1.5 text-xs font-medium rounded bg-accent text-[#052E16] hover:bg-accent-hover transition-colors cursor-pointer shrink-0">Click</button>
+            </div>
+          </div>
+          <div class="bg-[#1E293B] rounded-lg p-3 border border-[#334155]">
+            <label class="text-xs font-medium text-[#94A3B8] block mb-1.5">Type</label>
+            <div class="flex flex-col gap-2">
+              <div class="flex gap-2">
+                <input id="mTypeSel" type="text" placeholder="CSS selector" class="flex-1 bg-[#0F172A] border border-[#334155] rounded px-2 py-1.5 text-sm text-[#F8FAFC] placeholder-[#64748B] outline-none focus:border-accent/50" />
+                <input id="mTypeText" type="text" placeholder="Text" class="flex-1 bg-[#0F172A] border border-[#334155] rounded px-2 py-1.5 text-sm text-[#F8FAFC] placeholder-[#64748B] outline-none focus:border-accent/50" onkeydown="if(event.key==='Enter') mType()" />
+                <button onclick="mType()" class="px-3 py-1.5 text-xs font-medium rounded bg-accent text-[#052E16] hover:bg-accent-hover transition-colors cursor-pointer shrink-0">Type</button>
+              </div>
+            </div>
+          </div>
+          <div class="bg-[#1E293B] rounded-lg p-3 border border-[#334155]">
+            <label class="text-xs font-medium text-[#94A3B8] block mb-1.5">Scroll</label>
+            <div class="flex gap-2">
+              <select id="mScrollDir" class="bg-[#0F172A] border border-[#334155] rounded px-2 py-1.5 text-sm text-[#F8FAFC] outline-none focus:border-accent/50">
+                <option value="down">Down</option>
+                <option value="up">Up</option>
+              </select>
+              <input id="mScrollAmt" type="number" placeholder="px" value="300" class="w-20 bg-[#0F172A] border border-[#334155] rounded px-2 py-1.5 text-sm text-[#F8FAFC] placeholder-[#64748B] outline-none focus:border-accent/50" />
+              <button onclick="mScroll()" class="px-3 py-1.5 text-xs font-medium rounded bg-accent text-[#052E16] hover:bg-accent-hover transition-colors cursor-pointer">Scroll</button>
+            </div>
+          </div>
+          <div class="bg-[#1E293B] rounded-lg p-3 border border-[#334155]">
+            <label class="text-xs font-medium text-[#94A3B8] block mb-1.5">Extract</label>
+            <div class="flex gap-2">
+              <input id="mExtract" type="text" placeholder="CSS selector" class="flex-1 bg-[#0F172A] border border-[#334155] rounded px-2 py-1.5 text-sm text-[#F8FAFC] placeholder-[#64748B] outline-none focus:border-accent/50" onkeydown="if(event.key==='Enter') mExtract()" />
+              <button onclick="mExtract()" class="px-3 py-1.5 text-xs font-medium rounded bg-accent text-[#052E16] hover:bg-accent-hover transition-colors cursor-pointer shrink-0">Extract</button>
+            </div>
+            <pre id="mExtractResult" class="hidden mt-2 text-xs text-[#94A3B8] font-mono bg-[#0F172A] rounded p-2 max-h-24 overflow-y-auto whitespace-pre-wrap"></pre>
+          </div>
+          <div class="bg-[#1E293B] rounded-lg p-3 border border-[#334155]">
+            <label class="text-xs font-medium text-[#94A3B8] block mb-1.5">Screenshot</label>
+            <button onclick="mScreenshot()" class="px-3 py-1.5 text-xs font-medium rounded bg-accent text-[#052E16] hover:bg-accent-hover transition-colors cursor-pointer flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 13a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+              Take Screenshot
+            </button>
+          </div>
+        </div>
+        <div id="manualResult" class="hidden text-sm text-[#94A3B8] bg-[#1E293B] rounded-lg p-3 border border-[#334155] font-mono"></div>
+      </div>
+
+      <div id="tabInfo" class="hidden flex-1 overflow-y-auto p-4">
+        <div class="bg-[#1E293B] rounded-lg border border-[#334155] divide-y divide-[#334155]">
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">Session ID</span><span id="infoId" class="text-sm font-mono text-[#F8FAFC]">-</span></div>
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">Status</span><span id="infoStatus" class="text-sm font-mono text-accent">active</span></div>
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">URL</span><span id="infoUrl" class="text-sm font-mono text-[#F8FAFC] truncate max-w-[400px]">-</span></div>
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">Title</span><span id="infoTitle" class="text-sm font-mono text-[#F8FAFC] truncate max-w-[400px]">-</span></div>
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">Action Count</span><span id="infoActions" class="text-sm font-mono text-[#F8FAFC]">0</span></div>
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">Created</span><span id="infoCreated" class="text-sm font-mono text-[#F8FAFC]">-</span></div>
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">Last Active</span><span id="infoLastActive" class="text-sm font-mono text-[#F8FAFC]">-</span></div>
+          <div class="flex items-center justify-between px-4 py-3"><span class="text-sm text-[#94A3B8]">Messages</span><span id="infoMessages" class="text-sm font-mono text-[#F8FAFC]">0</span></div>
+        </div>
+        <div class="flex gap-3 mt-4">
+          <button onclick="clearHistory()" class="px-4 py-2 text-sm font-medium rounded-lg bg-[#1E293B] text-[#94A3B8] hover:bg-[#334155] hover:text-[#F8FAFC] transition-colors cursor-pointer border border-[#334155] flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Clear History
+          </button>
+          <button onclick="closeCurrentSession()" class="px-4 py-2 text-sm font-medium rounded-lg bg-red-600/20 text-red-400 hover:bg-red-600/30 transition-colors cursor-pointer border border-red-600/30 flex items-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+            Close Session
+          </button>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+const BASE = window.location.origin;
+
+let currentSessionId = null;
+let currentSessionData = null;
+
+function $(id) { return document.getElementById(id); }
+
+function api(path, opts = {}) {
+  const headers = { ...opts.headers };
+  if (opts.body) headers["Content-Type"] = "application/json";
+  const TIMEOUT = 30_000;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT);
+  return fetch(BASE + path, { ...opts, headers, signal: controller.signal })
+    .finally(() => clearTimeout(timer))
+    .then(r => r.ok ? r.json() : r.json().then(e => { throw new Error(e.error || `HTTP ${r.status}`) }));
+}
+
+async function createSession() {
+  try {
+    const data = await api("/sessions", { method: "POST" });
+    selectSession(data.sessionId);
+    return data;
+  } catch (e) {
+    console.error("createSession failed:", e);
+    const log = document.getElementById("chatLog");
+    if (log) {
+      const div = document.createElement("div");
+      div.innerHTML = `<div class="text-sm text-red-400 p-2">Failed to create session: ${e.message}</div>`;
+      log.prepend(div);
+    }
+  }
+}
+
+async function listSessions() {
+  const list = await api("/sessions");
+  return list;
+}
+
+async function selectSession(id) {
+  currentSessionId = id;
+  currentSessionData = null;
+  showView(id);
+  clearScreenshot();
+  await refreshSession();
+}
+
+async function refreshSession() {
+  if (!currentSessionId) return;
+  const data = await api(`/sessions/${currentSessionId}`);
+  currentSessionData = data;
+  updateInfo(data);
+  updateSessionList();
+  updateStateBar(data);
+}
+
+async function closeCurrentSession() {
+  if (!currentSessionId) return;
+  await api(`/sessions/${currentSessionId}`, { method: "DELETE" });
+  currentSessionId = null;
+  currentSessionData = null;
+  showView(null);
+  updateSessionList();
+}
+
+async function clearHistory() {
+  if (!currentSessionId) return;
+  await api(`/sessions/${currentSessionId}/history`, { method: "DELETE" });
+  $("chatLog").innerHTML = '<div class="text-[#64748B] text-center py-8">History cleared.<br/>Send a new prompt to start.</div>';
+  await refreshSession();
+}
+
+function clearScreenshot() {
+  $("screenshotImg").classList.add("hidden");
+  $("screenshotImg").src = "";
+  $("screenshotEmpty").classList.remove("hidden");
+}
+
+async function takeScreenshot() {
+  if (!currentSessionId) return;
+  $("screenshotOverlay").classList.remove("hidden");
+  try {
+    const res = await fetch(BASE + `/sessions/${currentSessionId}/interact`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: { tool: "screenshot" } }),
+    });
+    const data = await res.json();
+    if (data.success && data.data) {
+      const imgRes = await fetch(BASE + "/screenshot/" + encodeURIComponent(data.data));
+      if (imgRes.ok) {
+        const blob = await imgRes.blob();
+        const url = URL.createObjectURL(blob);
+        $("screenshotImg").src = url;
+        $("screenshotImg").classList.remove("hidden");
+        $("screenshotEmpty").classList.add("hidden");
+        $("screenshotImg").onload = () => URL.revokeObjectURL(url);
+      }
+    }
+  } catch (e) { console.error("Screenshot failed", e); }
+  $("screenshotOverlay").classList.add("hidden");
+}
+
+function showView(sessionId) {
+  if (sessionId) {
+    $("noSession").classList.add("hidden");
+    $("sessionView").classList.remove("hidden");
+  } else {
+    $("noSession").classList.remove("hidden");
+    $("sessionView").classList.add("hidden");
+  }
+}
+
+function updateInfo(data) {
+  if (!data) return;
+  $("infoId").textContent = data.id?.slice(0, 8) + "..." || "-";
+  $("infoStatus").textContent = data.status || "-";
+  $("infoUrl").textContent = data.url || "-";
+  $("infoTitle").textContent = data.title || "-";
+  $("infoActions").textContent = data.actionCount ?? 0;
+  $("infoMessages").textContent = data.messageCount ?? 0;
+  $("infoCreated").textContent = data.createdAt ? new Date(data.createdAt).toLocaleString() : "-";
+  $("infoLastActive").textContent = data.lastActiveAt ? new Date(data.lastActiveAt).toLocaleString() : "-";
+}
+
+function updateStateBar(data) {
+  if (!data) return;
+  $("stateUrl").textContent = data.url || "about:blank";
+  $("stateSteps").textContent = (data.actionCount ?? 0) + " steps";
+}
+
+async function updateSessionList() {
+  let list = [];
+  try { list = await listSessions(); } catch {}
+  const container = $("sessionList");
+  if (list.length === 0) {
+    container.innerHTML = '<div class="text-center text-sm text-[#64748B] py-8">No sessions yet.<br/>Click "New Session" above.</div>';
+    return;
+  }
+  container.innerHTML = list.map(s => {
+    const active = s.id === currentSessionId;
+    const shortId = s.id.slice(0, 8);
+    return `<div class="session-item ${active ? 'active' : ''} rounded-lg px-3 py-2 cursor-pointer border transition-all duration-200" onclick="selectSession('${s.id}')">
+      <div class="flex items-center justify-between">
+        <span class="text-sm font-mono ${active ? 'text-accent' : 'text-[#F8FAFC]'}">${shortId}</span>
+        <span class="text-[10px] text-[#64748B]">${s.actionCount || 0}</span>
+      </div>
+      <div class="text-xs text-[#64748B] truncate mt-0.5">${s.url || "about:blank"}</div>
+    </div>`;
+  }).join("");
+}
+
+function switchTab(name) {
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  document.querySelector(`[data-tab="${name}"]`).classList.add("active");
+  ["Agent","Manual","Info"].forEach(t => {
+    $(`tab${t}`).classList.toggle("hidden", t.toLowerCase() !== name);
+  });
+}
+
+function addChatMsg(type, content, details) {
+  const log = $("chatLog");
+  const empty = log.querySelector(".text-center.py-8");
+  if (empty) empty.remove();
+
+  const div = document.createElement("div");
+  div.className = "msg-step pl-3 py-2 space-y-1";
+
+  if (type === "prompt") {
+    div.innerHTML = `<div class="flex items-center gap-2"><span class="text-xs font-medium text-accent">&#9654; Prompt</span></div><div class="text-sm text-[#F8FAFC]">${escHtml(content)}</div>`;
+  } else if (type === "step") {
+    const color = details?.startsWith("[ERROR]") ? "text-red-400" : "text-[#94A3B8]";
+    div.innerHTML = `<div class="flex items-center gap-2"><span class="text-xs font-medium text-accent">Step</span><span class="text-xs ${color}">${escHtml(details || "")}</span></div><div class="text-sm text-[#F8FAFC]">${escHtml(content)}</div>`;
+  } else if (type === "result") {
+    div.innerHTML = `<div class="flex items-center gap-2"><span class="text-xs font-medium text-accent">&#10003; Result</span></div><div class="text-sm text-[#F8FAFC]">${escHtml(content)}</div>`;
+  } else if (type === "error") {
+    div.innerHTML = `<div class="flex items-center gap-2"><span class="text-xs font-medium text-red-400">&#10007; Error</span></div><div class="text-sm text-red-400">${escHtml(content)}</div>`;
+  } else if (type === "separator") {
+    div.innerHTML = `<div class="border-t border-[#334155] my-1"></div>`;
+  }
+
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function escHtml(s) {
+  const d = document.createElement("div");
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+const AGENT_TIMEOUT = 120_000;
+
+async function runAgent() {
+  const input = $("agentPrompt");
+  const prompt = input.value.trim();
+  if (!prompt || !currentSessionId) return;
+
+  // Clear input immediately to provide instant visual feedback
+  input.value = "";
+  input.focus();
+
+  const btn = $("agentBtn");
+  btn.disabled = true;
+  btn.innerHTML = '<svg class="w-4 h-4 spinner" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg> Working';
+
+  addChatMsg("prompt", prompt);
+  $("screenshotOverlay").classList.remove("hidden");
+
+  try {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), AGENT_TIMEOUT);
+
+    const res = await fetch(BASE + `/sessions/${currentSessionId}/agent/stream`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt }),
+      signal: controller.signal,
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.error || `HTTP ${res.status}`);
+    }
+
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let currentEvent = "";
+    let stepCount = 0;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("event: ")) {
+          currentEvent = line.slice(7).trim();
+        } else if (line.startsWith("data: ")) {
+          try {
+            const data = JSON.parse(line.slice(6));
+            handleStreamEvent(currentEvent, data);
+            if (data.step) stepCount = Math.max(stepCount, data.step);
+          } catch {}
+        }
+      }
+    }
+
+    clearTimeout(timer);
+  } catch (e) {
+    const msg = e.name === "AbortError" ? "Request timed out (120s)" : e.message || "Request failed";
+    addChatMsg("error", msg);
+  } finally {
+    $("screenshotOverlay").classList.add("hidden");
+    btn.disabled = false;
+    btn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"/></svg> Send';
+    await refreshSession();
+    await takeScreenshot();
+  }
+}
+
+async function handleStreamEvent(event, data) {
+  switch (event) {
+    case "status":
+      addChatMsg("step", data.message || "...", "");
+      break;
+
+    case "thinking":
+      addChatMsg("step", `Thinking (step ${data.step})...`, "thinking");
+      break;
+
+    case "tool_call": {
+      const argsStr = Object.entries(data.args || {}).map(([k, v]) => `${k}=${typeof v === "string" ? v.slice(0, 60) : v}`).join(" ");
+      addChatMsg("step", `${data.tool} ${argsStr}`, "running");
+      break;
+    }
+
+    case "tool_result": {
+      const icon = data.success ? "✓" : "✗";
+      const color = data.success ? "text-accent" : "text-red-400";
+      addChatMsg("step", `${icon} ${data.tool} (${data.durationMs}ms, ${data.resultLen} bytes)`, data.success ? "ok" : "error");
+      // Auto-refresh screenshot after each completed tool action
+      if (data.tool !== "screenshot") {
+        await takeScreenshot();
+      }
+      break;
+    }
+
+    case "done":
+      addChatMsg("separator", "");
+      addChatMsg("result", data.result || "Done");
+      if (data.steps) {
+        addChatMsg("", `(${data.steps} steps, route: ${data.route || "?"})`, "");
+      }
+      break;
+
+    case "error":
+      addChatMsg("error", data.error || "Unknown error");
+      break;
+
+    case "timeout":
+      addChatMsg("error", "Agent loop timed out");
+      break;
+  }
+}
+
+async function manualAction(tool, args) {
+  if (!currentSessionId) return;
+  $("screenshotOverlay").classList.remove("hidden");
+  try {
+    const data = await api(`/sessions/${currentSessionId}/interact`, {
+      method: "POST",
+      body: JSON.stringify({ action: { tool, args } }),
+    });
+    const resultDiv = $("manualResult");
+    resultDiv.classList.remove("hidden");
+    if (data.success) {
+      resultDiv.innerHTML = '<span class="text-accent">✓</span> ' + escHtml(data.data || "Done");
+    } else {
+      resultDiv.innerHTML = '<span class="text-red-400">✗</span> ' + escHtml(data.error || "Failed");
+    }
+    await refreshSession();
+    if (tool !== "extract") {
+      await takeScreenshot();
+    }
+    return data;
+  } catch (e) {
+    $("manualResult").classList.remove("hidden");
+    $("manualResult").innerHTML = '<span class="text-red-400">✗</span> ' + escHtml(e.message);
+  } finally {
+    $("screenshotOverlay").classList.add("hidden");
+  }
+}
+
+function mNavigate() {
+  const url = $("mUrl").value.trim();
+  if (url) manualAction("navigate", { url });
+}
+
+function mClick() {
+  const sel = $("mClick").value.trim();
+  if (sel) manualAction("click", { selector: sel });
+}
+
+function mType() {
+  const sel = $("mTypeSel").value.trim();
+  const text = $("mTypeText").value.trim();
+  if (sel && text) manualAction("type", { selector: sel, text });
+}
+
+function mScroll() {
+  const dir = $("mScrollDir").value;
+  const amt = $("mScrollAmt").value || "300";
+  manualAction("scroll", { direction: dir, amount: amt });
+}
+
+async function mExtract() {
+  const sel = $("mExtract").value.trim();
+  if (!sel) return;
+  const data = await manualAction("extract", { selector: sel });
+  const resultEl = $("mExtractResult");
+  if (data && data.success && data.data) {
+    resultEl.classList.remove("hidden");
+    resultEl.textContent = data.data;
+  } else if (data && !data.success) {
+    resultEl.classList.remove("hidden");
+    resultEl.textContent = "Error: " + (data.error || "Unknown");
+  }
+}
+
+async function mScreenshot() {
+  await manualAction("screenshot", {});
+  await takeScreenshot();
+}
+
+updateSessionList();
+</script>
+</body>
+</html>
